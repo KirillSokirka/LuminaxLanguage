@@ -7,11 +7,11 @@ public class BracketsProcessor
     // ReSharper disable once InconsistentNaming
     private Stack<string> BracketsStack = new(4);
 
-    public void ControlBracketsFlow(SymbolInformation bracket)
+    public bool ControlBracketsFlow(SymbolInformation bracket, string expectedBracket)
     {
         var result = false;
 
-        if (bracket.LexemeToken == "par_op")
+        if (bracket.LexemeToken == "par_op" && bracket.Lexeme == expectedBracket)
         {
             if (bracket.Lexeme is "{" or "(")
             {
@@ -32,11 +32,13 @@ public class BracketsProcessor
         {
             throw new Exception("erorr,");
         }
+
+        return result;
     }
 
     public void CheckStackStatus()
     {
-        if (BracketsStack.Count == 0)
+        if (BracketsStack.Count != 0)
         {
             throw new Exception("eror with brackets");
         }

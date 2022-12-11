@@ -1,8 +1,8 @@
 ﻿program name {
 	{
-		float while, a, b;
-		int y, d;
+		float x, a, b;
 	}
 	{
+		x = a + b;
 	}
 }

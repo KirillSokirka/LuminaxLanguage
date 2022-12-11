@@ -5,7 +5,7 @@ var lexicalAnalyzer = new LexicalAnalyzer();
 try
 {
     var currentState = 0;
-    var filePath = "C:\\Users\\kyrylo.sokyrka\\Repositories\\Personal\\LexicalAnalyser\\LexicalAnalyser\\test.txt";
+    var filePath = "C:\\Users\\kyrylo.sokyrka\\Source\\Repos\\KirillSokirka\\LuminaxLanguage\\LuminaxLanguage\\test.txt";
     foreach (var lineOfText in TextReader.GetLineOfText(filePath))
     {
         lexicalAnalyzer.Analyze(lineOfText, ref currentState);
@@ -17,10 +17,6 @@ try
     }
 
     Console.WriteLine("Lexer: Lexical analyzer was successfully completed");
-
-    var bracketsProcessor = new BracketsProcessor();
-    var syntaxAnalyzer = new SyntaxAnalyzer(lexicalAnalyzer.AnalysisInformation, bracketsProcessor);
-    syntaxAnalyzer.ParseProgram();
 }
 catch (Exception e)
 {
@@ -30,3 +26,7 @@ catch (Exception e)
     Console.WriteLine(mainMessage);
     Console.WriteLine($"Lexer: Analysis failed with status {errorCode}");
 }
+
+var bracketsProcessor = new BracketsProcessor();
+var syntaxAnalyzer = new SyntaxAnalyzer(lexicalAnalyzer.AnalysisInformation, bracketsProcessor);
+syntaxAnalyzer.ParseProgram();

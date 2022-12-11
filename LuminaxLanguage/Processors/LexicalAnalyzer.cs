@@ -1,6 +1,5 @@
 ﻿using LuminaxLanguage.Constants;
 using LuminaxLanguage.Dto;
-using LuminaxLanguage.Tables;
 
 namespace LuminaxLanguage.Processors
 {
