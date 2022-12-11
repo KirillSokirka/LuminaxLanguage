@@ -1,0 +1,8 @@
+﻿program name {
+	{
+		float while, a, b;
+		int y, d;
+	}
+	{
+	}
+}
