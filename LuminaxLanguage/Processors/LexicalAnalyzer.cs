@@ -22,6 +22,7 @@ namespace LuminaxLanguage.Processors
                 CheckForErrors(currentState, lineOfCode[_counter]);
 
                 ProcessStates(lineOfCode[_counter], ref lexeme, ref currentState);
+
             }
 
             _counter = 0;
@@ -48,17 +49,17 @@ namespace LuminaxLanguage.Processors
 
         private void CheckForErrors(int currentState, char symbol)
         {
-            switch (currentState)
-            {
-                case 101:
-                    throw new Exception($"101 Lexer: in line {LineOfCode} unexpected symbol '{symbol}'");
-                case 102:
-                    throw new Exception($"102 Lexer: in line {LineOfCode} '=' was expected, received - '{symbol}'");
-                case 103:
-                    throw new Exception($"103 Lexer: in line {LineOfCode} Digit was expected, received - '{symbol}'");
-                case 104:
-                    throw new Exception($"104 Lexer: in line {LineOfCode} '-' or Digit were expected, received - '{symbol}'");
-            }
+        switch (currentState)
+        {
+            case 101:
+                throw new Exception($"101 Lexer: in line {LineOfCode} unexpected symbol '{symbol}'");
+            case 102:
+                throw new Exception($"102 Lexer: in line {LineOfCode} '=' was expected, received - '{symbol}'");
+            case 103:
+                throw new Exception($"103 Lexer: in line {LineOfCode} Digit was expected, received - '{symbol}'");
+            case 104:
+                throw new Exception($"104 Lexer: in line {LineOfCode} '-' or Digit were expected, received - '{symbol}'");
+        }
         }
 
         private void ProcessStates(char symbol, ref string lexeme, ref int currentState)
@@ -89,6 +90,10 @@ namespace LuminaxLanguage.Processors
                 lexeme = $"\\n";
                 LineOfCode++;
             }
+            else if (token is "keyword")
+            {
+                _counter--;
+            }
             else if (token == "ident")
             {
                 if (!AnalysisInformation.Ids.ContainsKey(lexeme))
@@ -109,7 +114,7 @@ namespace LuminaxLanguage.Processors
 
                 _counter--;
             }
-            else if (new[] { "punct", "add_op", "mult_op", "power_op", "par_op", "rel_op" }.Contains(token))
+            else if (new[] { "punct", "add_op", "mult_op", "pow_op", "par_op", "rel_op" }.Contains(token))
             {
                 lexeme += symbol;
             }
@@ -117,6 +122,8 @@ namespace LuminaxLanguage.Processors
             var data = new SymbolInformation(LineOfCode, lexeme, token, indexOfConstOrIndent);
             AnalysisInformation.SymbolsInformation
                 .Add(AnalysisInformation.SymbolsInformation.Count, data);
+            
+            Console.WriteLine($"{LineOfCode}\t {lexeme} {token} {indexOfConstOrIndent}");
 
             lexeme = string.Empty;
         }

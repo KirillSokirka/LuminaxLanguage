@@ -15,7 +15,7 @@ namespace LuminaxLanguage.Processors
             get
             {
                 if (++_iterator > AnalysisInformation!.Count - 1)
-                    throw new Exception("error");
+                    throw new Exception("Parser: ");
                 return _iterator;
             }
             set => _iterator = value;
@@ -48,7 +48,7 @@ namespace LuminaxLanguage.Processors
                 }
                 else
                 {
-                    throw new Exception("");
+                    throw new Exception("Parser: unexpected error");
                 }
             }
 
@@ -100,7 +100,7 @@ namespace LuminaxLanguage.Processors
         }
 
         private static bool ParseIdentToken(SymbolInformation symbolInformation) =>
-            ParseToken("ident", symbolInformation);
+            symbolInformation.LexemeToken == "ident" && ParseToken("ident", symbolInformation);
 
         private static bool ParseTypeToken(SymbolInformation symbolInformation) =>
             new[] { "int", "float", "boolean" }.Contains(symbolInformation.Lexeme) &&
@@ -148,7 +148,7 @@ namespace LuminaxLanguage.Processors
                 {
                     symbolInformation = AnalysisInformation[Iterator];
 
-                    symbolInformation = ParseIdentList(symbolInformation);
+                    symbolInformation = ParseIdentList(symbolInformation, ";");
 
                     ParseToken((";", "punct"), symbolInformation);
                 }
@@ -157,13 +157,13 @@ namespace LuminaxLanguage.Processors
             return symbolInformation;
         }
 
-        private SymbolInformation ParseIdentList(SymbolInformation symbolInformation)
+        private SymbolInformation ParseIdentList(SymbolInformation symbolInformation, string endOfIdent)
         {
             if (ParseIdentToken(symbolInformation))
             {
                 symbolInformation = AnalysisInformation![Iterator];
 
-                while (symbolInformation.Lexeme != ";")
+                while (symbolInformation.Lexeme != endOfIdent)
                 {
                     if (ParseToken((",", "punct"), symbolInformation))
                     {
@@ -183,9 +183,7 @@ namespace LuminaxLanguage.Processors
 
             while (ProcessStatementList()) { }
 
-            _iterator--;
-
-            _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "}");
+            _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![_iterator], "}");
         }
 
         private bool ProcessStatementList()
@@ -200,7 +198,7 @@ namespace LuminaxLanguage.Processors
                 { LexemeToken: "keyword", Lexeme: "if" } => ProcessIfExpression(symbolInformation),
                 { LexemeToken: "keyword", Lexeme: "do" } => ProcessDoWhileExpression(symbolInformation),
                 { LexemeToken: "par_op", Lexeme: "}" } => false,
-                _ => throw new Exception("bebra")
+                _ => throw new Exception($"Parser: unexpected token {symbolInformation.Lexeme}")
             };
 
             return result;
@@ -220,7 +218,7 @@ namespace LuminaxLanguage.Processors
 
                     if (result)
                     {
-                        result = ParseToken((";", "punct"), symbolInformation);
+                        result = ParseToken((";", "punct"), AnalysisInformation![_iterator]);
                     }
                 }
                 else
@@ -261,7 +259,39 @@ namespace LuminaxLanguage.Processors
                 return true;
             }
 
-            return ParseArithmeticExpression(symbol) && ParseRelExpression(symbol) && ParseArithmeticExpression(symbol);
+            if (symbol.Lexeme is "(" && _bracketsProcessor.ControlBracketsFlow(symbol, "("))
+            {
+                if (ParseArithmeticExpression(AnalysisInformation[Iterator]))
+                {
+                    symbol = AnalysisInformation[_iterator];
+                    if (ParseRelExpression(symbol))
+                    {
+                        symbol = AnalysisInformation[Iterator];
+                        if (ParseArithmeticExpression(symbol))
+                        {
+                            if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation[_iterator], ")"))
+                            {
+                                _iterator++;
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            else if (ParseArithmeticExpression(symbol))
+            {
+                symbol = AnalysisInformation[_iterator];
+                if (ParseRelExpression(symbol))
+                {
+                    symbol = AnalysisInformation[Iterator];
+                    if (ParseArithmeticExpression(symbol))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private bool ParseRelExpression(SymbolInformation symbolInformation)
@@ -334,15 +364,13 @@ namespace LuminaxLanguage.Processors
 
         private bool ParseFactor(SymbolInformation symbol)
         {
-            if (ParseIdentToken(symbol) || ParseConst(symbol))
+            if (ParseConst(symbol) || ParseIdentToken(symbol))
             {
                 _iterator++;
                 return true;
             }
 
-            symbol = AnalysisInformation![Iterator];
-
-            if (symbol.Lexeme is "(" && _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "("))
+            if (symbol.Lexeme is "(" && _bracketsProcessor.ControlBracketsFlow(symbol, "("))
             {
                 if (ParseArithmeticExpression(AnalysisInformation![Iterator]))
                 {
@@ -354,7 +382,10 @@ namespace LuminaxLanguage.Processors
         }
 
         private bool ParseConst(SymbolInformation symbol)
-            => ParseToken("boolval", symbol) || ParseNumber(symbol, "int") || ParseNumber(symbol, "float");
+            => (symbol.LexemeToken is "boolval" && ParseToken("boolval", symbol)) ||
+                (symbol.LexemeToken is "int" && ParseNumber(symbol, "int")) ||
+                (symbol.LexemeToken is "exp" && ParseNumber(symbol, "exp")) ||
+                (symbol.LexemeToken is "float" && ParseNumber(symbol, "float"));
 
         private bool ParseNumber(SymbolInformation symbol, string typeOfNumber)
         {
@@ -364,7 +395,7 @@ namespace LuminaxLanguage.Processors
                     return false;
             }
 
-            return ParseToken(typeOfNumber, AnalysisInformation![Iterator]);
+            return ParseToken(typeOfNumber, symbol);
         }
 
         private bool ProcessDoWhileExpression(SymbolInformation symbolInformation)
@@ -373,15 +404,18 @@ namespace LuminaxLanguage.Processors
             {
                 if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "{"))
                 {
-                    if (ProcessStatementList())
+                    while (ProcessStatementList()) { }
+
+                    if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![_iterator], "}"))
                     {
-                        if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "}"))
+                        if (ParseToken(("while", "keyword"), AnalysisInformation![Iterator]))
                         {
-                            if (ParseToken(("while", "keyword"), AnalysisInformation![Iterator]))
+                            if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation[Iterator], "("))
                             {
-                                return _bracketsProcessor.ControlBracketsFlow(AnalysisInformation[Iterator], "(")
-                                       && ParseBooleanExpression()
-                                       && _bracketsProcessor.ControlBracketsFlow(AnalysisInformation[Iterator], ")");
+                                if (ParseBooleanExpression())
+                                {
+                                    return _bracketsProcessor.ControlBracketsFlow(AnalysisInformation[_iterator], ")");
+                                }
                             }
                         }
                     }
@@ -399,11 +433,13 @@ namespace LuminaxLanguage.Processors
                 {
                     if (ParseBooleanExpression())
                     {
-                        if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], ")"))
+                        if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![_iterator], ")"))
                         {
-                            return _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "{") &&
-                                   ProcessStatementList() &&
-                                   _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "}");
+                            _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "{");
+
+                            while (ProcessStatementList()) { }
+
+                            return _bracketsProcessor.ControlBracketsFlow(AnalysisInformation![_iterator], "}");
                         }
                     }
                 }
@@ -418,9 +454,12 @@ namespace LuminaxLanguage.Processors
             {
                 if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "("))
                 {
-                    symbolInformation = ParseIdentList(AnalysisInformation[Iterator]);
+                    symbolInformation = ParseIdentList(AnalysisInformation[Iterator], ")");
 
-                    return _bracketsProcessor.ControlBracketsFlow(symbolInformation, ")");
+                    if (_bracketsProcessor.ControlBracketsFlow(symbolInformation, ")"))
+                    {
+                        return ParseToken((";", "punct"), AnalysisInformation[Iterator]);
+                    }
                 }
             }
 
@@ -433,15 +472,17 @@ namespace LuminaxLanguage.Processors
             {
                 if (_bracketsProcessor.ControlBracketsFlow(AnalysisInformation![Iterator], "("))
                 {
-                    symbolInformation = ParseIdentList(AnalysisInformation[Iterator]);
+                    symbolInformation = ParseIdentList(AnalysisInformation[Iterator], ")");
 
-                    return _bracketsProcessor.ControlBracketsFlow(symbolInformation, ")");
+                    if (_bracketsProcessor.ControlBracketsFlow(symbolInformation, ")"))
+                    {
+                        return ParseToken((";", "punct"), AnalysisInformation[Iterator]);
+                    }
                 }
             }
 
             return false;
         }
-
 
         #endregion
     }

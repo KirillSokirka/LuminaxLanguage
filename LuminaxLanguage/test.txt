@@ -1,8 +1,26 @@
-﻿program name {
-	{
-		float x, a, b;
+﻿program myprogram {
+{
+int x,y,z, i;
+float a,b;
+boolean c;
+}
+{
+a = x ^ y;
+print(x, y);
+input(x,y);
+x = x + 3;
+y = y * 2;
+x = x - 2;
+y = y / 3;
+a = x ^ y;
+b = 1.3E02;
+c = (5 <= 3);
+i = 4;
+do {
+	if (i / 2 != 0) {
+		print(i);
 	}
-	{
-		x = a + b;
-	}
+	i = i - 1;
+} while (i >= 0)
+}
 }

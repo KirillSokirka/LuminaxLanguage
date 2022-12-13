@@ -1,4 +1,5 @@
-﻿using LuminaxLanguage.Dto;
+﻿using LuminaxLanguage.Constants;
+using LuminaxLanguage.Dto;
 
 namespace LuminaxLanguage.Processors;
 
@@ -13,6 +14,8 @@ public class BracketsProcessor
 
         if (bracket.LexemeToken == "par_op" && bracket.Lexeme == expectedBracket)
         {
+            Console.WriteLine(ParserMessages.Information, bracket.LineNumber, bracket.Lexeme, bracket.LexemeToken);
+            
             if (bracket.Lexeme is "{" or "(")
             {
                 BracketsStack.Push(bracket.Lexeme);
@@ -30,7 +33,7 @@ public class BracketsProcessor
 
         if (!result)
         {
-            throw new Exception("erorr,");
+            throw new Exception($"Parser: unexpected bracket '{bracket.Lexeme}', expected - {expectedBracket}");
         }
 
         return result;
@@ -40,7 +43,7 @@ public class BracketsProcessor
     {
         if (BracketsStack.Count != 0)
         {
-            throw new Exception("eror with brackets");
+            throw new Exception("Parser: some brackets wasn't closed");
         }
     }
 }
