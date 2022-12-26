@@ -46,6 +46,7 @@ namespace LuminaxLanguage.Constants
                 { new StateTransition(14, "E"), 15},
                 { new StateTransition(15, "-"), 17},
                 { new StateTransition(17, "Digit"), 13},
+                { new StateTransition(15, "other"), 104},
                 { new StateTransition(17, "other"), 104},
                 { new StateTransition(15, "Digit"), 13},
                 { new StateTransition(13, "Digit"), 13},

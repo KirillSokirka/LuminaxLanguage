@@ -8,6 +8,7 @@ namespace LuminaxLanguage.Processors
         public int LineOfCode { get; set; } = 1;
         public AnalysisInformation AnalysisInformation { get; } = new();
         private int _counter;
+        private string _currentType = string.Empty;
 
         public void Analyze(string lineOfCode, ref int currentState)
         {
@@ -22,7 +23,6 @@ namespace LuminaxLanguage.Processors
                 CheckForErrors(currentState, lineOfCode[_counter]);
 
                 ProcessStates(lineOfCode[_counter], ref lexeme, ref currentState);
-
             }
 
             _counter = 0;
@@ -99,7 +99,9 @@ namespace LuminaxLanguage.Processors
                 if (!AnalysisInformation.Ids.ContainsKey(lexeme))
                 {
                     indexOfConstOrIndent = AnalysisInformation.Ids.Count + 1;
-                    AnalysisInformation.Ids.Add(lexeme, (int)indexOfConstOrIndent);
+
+                    AnalysisInformation.Ids.Add(lexeme, 
+                        new ValueContainer((int)indexOfConstOrIndent, null, null));
                 }
 
                 _counter--;
@@ -108,8 +110,9 @@ namespace LuminaxLanguage.Processors
             {
                 if (!AnalysisInformation.Constants.ContainsKey(lexeme))
                 {
-                    indexOfConstOrIndent = AnalysisInformation.Ids.Count + 1;
-                    AnalysisInformation.Constants.Add(lexeme, (int)indexOfConstOrIndent);
+                    indexOfConstOrIndent = AnalysisInformation.Constants.Count + 1;
+                    AnalysisInformation.Constants.Add(lexeme,
+                        new ValueContainer((int)indexOfConstOrIndent, token, null));
                 }
 
                 _counter--;
