@@ -96,13 +96,13 @@ namespace LuminaxLanguage.Processors
             {
                 var tokenInfo = _postfixCode[_iterator];
 
-                result = tokenInfo.Lexeme switch
+                result = tokenInfo switch
                 {
-                    "boolval" or "int" or "float" or "exp" => InterpretIdentExpression(tokenInfo),
-                    "input" => InterpretInputExpression(tokenInfo),
-                    "print" => InterpretOutputExpression(tokenInfo),
-                    "DO" => InterpretDoWhileExpression(tokenInfo),
-                    "IF" => InterpretIfExpression(tokenInfo),
+                    { Token: "boolval" or "int" or "float" or "exp" or "ident" } => InterpretIdentExpression(tokenInfo),
+                    { Lexeme: "input" } => InterpretInputExpression(),
+                    { Lexeme: "print" } => InterpretOutputExpression(),
+                    { Lexeme: "DO" } => InterpretDoWhileExpression(),
+                    { Lexeme: "IF" } => InterpretIfExpression(),
                     _ => InterpretSection(tokenInfo)
                 };
 
@@ -157,6 +157,13 @@ namespace LuminaxLanguage.Processors
                     throw new InterpreterException($"Variable {right.Lexeme} was not declared");
                 }
             }
+            else if (_analysisInformation.Constants.TryGetValue(right.Lexeme, out rightValue))
+            {
+                if (rightValue.Type is null)
+                {
+                    throw new InterpreterException($"Variable {right.Lexeme} was not declared");
+                }
+            }
 
             if (leftValue is not null && rightValue is not null)
             {
@@ -202,7 +209,7 @@ namespace LuminaxLanguage.Processors
             {
                 var valueInformation =
                     _analysisInformation!.Constants[left.Lexeme];
-                
+
                 idInTable = valueInformation.IdInTable;
                 value = valueInformation.Value;
             }
@@ -250,7 +257,7 @@ namespace LuminaxLanguage.Processors
                 {
                     throw new InterpreterException("Division by zero");
                 }
-                
+
                 value = leftConvertedValue.Item1 / rightConvertedValue.Item1;
 
                 if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
@@ -273,7 +280,7 @@ namespace LuminaxLanguage.Processors
             if (!_analysisInformation!.Constants.ContainsKey(newConstLexeme))
             {
                 _analysisInformation!.Constants[newConstLexeme]
-                    = new ValueContainer((int) _analysisInformation!.Constants.Count + 1, left.Type, value);
+                    = new ValueContainer((int)_analysisInformation!.Constants.Count + 1, left.Type, value);
             }
 
             _stack.Push(new TokenInformation(newConstLexeme, left.Type));
@@ -295,7 +302,7 @@ namespace LuminaxLanguage.Processors
             return (convertedValue, type);
         }
 
-        private void InterpretBooleanOperations(TokenInformation left, TokenInformation operation, TokenInformation right)
+        private bool InterpretBooleanOperations(TokenInformation left, TokenInformation operation, TokenInformation right)
         {
             var result = false;
 
@@ -307,22 +314,24 @@ namespace LuminaxLanguage.Processors
                 throw new InterpreterException("Using uninitialized variables in arithmetic expression isn't allowed");
             }
 
-            ProcessBooleanExpression(leftValue, operation, rightValue);
+            result = ProcessBooleanExpression(leftValue, operation, rightValue);
+
+            return result;
         }
 
-        private void ProcessBooleanExpression(ValueContainer leftValue, TokenInformation operation, ValueContainer rightValue)
+        private bool ProcessBooleanExpression(ValueContainer leftValue, TokenInformation operation, ValueContainer rightValue)
         {
             if (leftValue.Type is "boolval" && leftValue.Type == rightValue.Type)
             {
-                leftValue = new ValueContainer(leftValue.IdInTable, "int", (int) leftValue.Value!);
-                rightValue = new ValueContainer(leftValue.IdInTable, "int", (int) rightValue.Value!);
+                leftValue = new ValueContainer(leftValue.IdInTable, "int", (int)leftValue.Value!);
+                rightValue = new ValueContainer(leftValue.IdInTable, "int", (int)rightValue.Value!);
                 CompareNumbers(leftValue, operation, rightValue);
-                return;
+                return true;
             }
-            else if ((new [] {"int", "float", "exp"}).Contains(leftValue.Type) && leftValue.Type == rightValue.Type)
+            else if ((new[] { "int", "float", "exp" }).Contains(leftValue.Type) && leftValue.Type == rightValue.Type)
             {
                 CompareNumbers(leftValue, operation, rightValue);
-                return;
+                return true;
             }
 
             throw new InterpreterException("Allowed to compare only boolean or number expression");
@@ -330,8 +339,8 @@ namespace LuminaxLanguage.Processors
 
         private void CompareNumbers(ValueContainer leftValue, TokenInformation operation, ValueContainer rightValue)
         {
-            var leftFloatValue = (float) leftValue.Value!;
-            var rightFloatValue = (float) leftValue.Value!;
+            var leftFloatValue = (float)leftValue.Value!;
+            var rightFloatValue = (float)rightValue.Value!;
 
             var result = operation.Lexeme switch
             {
@@ -353,25 +362,88 @@ namespace LuminaxLanguage.Processors
             }
 
             _stack.Push(new TokenInformation(newConstLexeme, "boolean"));
-
         }
 
-        private bool InterpretInputExpression(TokenInformation tokenInfo)
+        private bool InterpretInputExpression()
+        {
+            var tokenInfo = _stack.Pop();
+
+            var tokenValue = GetTokenValue(tokenInfo);
+
+            if (tokenValue.Type is null)
+            {
+                throw new InterpreterException($"There is no declared variable with name {tokenInfo.Lexeme}");
+            }
+
+            var data = Console.ReadLine();
+
+            tokenValue = ParseConsoleInput(data, tokenValue);
+
+            if (tokenValue is not null)
+            {
+                _analysisInformation!.Ids[tokenInfo.Lexeme] = tokenValue;
+                return true;
+            }
+
+            return false;
+        }
+
+        private ValueContainer? ParseConsoleInput(string? data, ValueContainer valueContainer)
+        {
+            if (data is null or "")
+            {
+                throw new InterpreterException("No data was provided for variable input");
+            }
+
+            var newValueContainer = valueContainer;
+
+            if (int.TryParse(data, out var value) && newValueContainer.Type is "int")
+            {
+                newValueContainer = newValueContainer with { Value = value, Type = "int" };
+            }
+            else if (float.TryParse(data, out var floatValue) && newValueContainer.Type is "float")
+            {
+                newValueContainer = newValueContainer with { Value = floatValue, Type = "float" };
+            }
+            else if (bool.TryParse(data, out var boolValue) && newValueContainer.Type is "boolval")
+            {
+                newValueContainer = newValueContainer with { Value = boolValue, Type = "boolval" };
+            }
+            else
+            {
+                throw new InterpreterException("Invalid input");
+            }
+
+            return newValueContainer;
+        }
+
+        private bool InterpretOutputExpression()
+        {
+            var tokenInfo = _stack.Pop();
+
+            var tokenValue = GetTokenValue(tokenInfo);
+
+            if (tokenValue.Type is null)
+            {
+                throw new InterpreterException($"The variable {tokenInfo.Lexeme} wasn't declared");
+            }
+
+            if (tokenValue.Value is null)
+            {
+                throw new InterpreterException($"The variable {tokenInfo.Lexeme} wasn't initialized");
+            }
+
+            Console.WriteLine($"The variable - {tokenInfo.Lexeme} has value - {tokenValue.Value} ({tokenValue.Type})");
+
+            return true;
+        }
+
+        private bool InterpretIfExpression()
         {
             throw new NotImplementedException();
         }
 
-        private bool InterpretOutputExpression(TokenInformation tokenInfo)
-        {
-            throw new NotImplementedException();
-        }
-
-        private bool InterpretIfExpression(TokenInformation tokenInfo)
-        {
-            throw new NotImplementedException();
-        }
-
-        private bool InterpretDoWhileExpression(TokenInformation tokenInfo)
+        private bool InterpretDoWhileExpression()
         {
             throw new NotImplementedException();
         }

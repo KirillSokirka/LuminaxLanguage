@@ -161,7 +161,7 @@ namespace LuminaxLanguage.Processors
                 if (ParseTypeToken(symbolInformation))
                 {
                     var type = symbolInformation.Lexeme;
-                    
+
                     symbolInformation = SymbolsInformation[Iterator];
 
                     symbolInformation = ParseIdentList(symbolInformation, ";", type);
@@ -186,7 +186,7 @@ namespace LuminaxLanguage.Processors
                     AnalysisInformation.Ids[symbolInformation.Lexeme] =
                         value with { Type = type };
                 }
-                
+
                 symbolInformation = SymbolsInformation![Iterator];
 
                 while (symbolInformation.Lexeme != endOfIdent)
@@ -202,7 +202,7 @@ namespace LuminaxLanguage.Processors
                         }
 
                         uniquenessList.Add(symbolInformation.Lexeme);
-                        
+
                         if (type is not "")
                         {
                             var value = AnalysisInformation.Ids[symbolInformation.Lexeme];
@@ -270,6 +270,8 @@ namespace LuminaxLanguage.Processors
                     {
                         result = ParseToken((";", "punct"), SymbolsInformation![_iterator]);
                     }
+
+                    PostfixCode.Add(new TokenInformation("=", "assign_op"));
                 }
                 else
                 {
@@ -309,7 +311,7 @@ namespace LuminaxLanguage.Processors
                 PostfixCode.Add(new TokenInformation(symbol.Lexeme, symbol.LexemeToken));
                 return true;
             }
-
+            
             if (ParseArithmeticExpression(symbol))
             {
                 symbol = SymbolsInformation[_iterator];
@@ -322,6 +324,8 @@ namespace LuminaxLanguage.Processors
                         return true;
                     }
                 }
+
+                return true;
             }
 
             return false;
@@ -447,25 +451,18 @@ namespace LuminaxLanguage.Processors
                 }
             }
 
-            return (symbol.LexemeToken is "int" && ParseNumber(symbol, "int", addToPolis)) ||
-                    (symbol.LexemeToken is "exp" && ParseNumber(symbol, "exp", addToPolis)) ||
-                    (symbol.LexemeToken is "float" && ParseNumber(symbol, "float", addToPolis));
+            return (symbol.LexemeToken is "int" && ParseNumber(symbol, "int")) ||
+                    (symbol.LexemeToken is "exp" && ParseNumber(symbol, "exp")) ||
+                    (symbol.LexemeToken is "float" && ParseNumber(symbol, "float"));
         }
 
-        private bool ParseNumber(SymbolInformation symbol, string typeOfNumber, bool addToPolis = true)
+        private bool ParseNumber(SymbolInformation symbol, string typeOfNumber)
         {
-            if (symbol.Lexeme is "+" or "-")
+            if (ParseToken(typeOfNumber, symbol))
             {
-                if (ParseToken("add_op", symbol))
-                {
-                    if (ParseToken(typeOfNumber, symbol))
-                    {
-                        if (addToPolis)
-                            PostfixCode.Add(new TokenInformation(symbol.Lexeme, symbol.LexemeToken));
+                PostfixCode.Add(new TokenInformation(symbol.Lexeme, symbol.LexemeToken));
 
-                        return true;
-                    }
-                }
+                return true;
             }
 
             return false;

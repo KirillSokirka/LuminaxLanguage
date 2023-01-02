@@ -1,8 +1,10 @@
 ﻿program myprogram {
 {
 	int a, c, d;
-	float a;
+	float x;
 }
 {
+	input(a);
+	print(x);
 }
 }
