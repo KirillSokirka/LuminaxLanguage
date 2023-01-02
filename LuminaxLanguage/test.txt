@@ -1,10 +1,10 @@
 ﻿program myprogram {
 {
-	int a, c, d;
-	float x;
+	int x;
+	float a;
 }
 {
-	input(a);
+	x = 2 ^ 2 ^ 2;
 	print(x);
 }
 }

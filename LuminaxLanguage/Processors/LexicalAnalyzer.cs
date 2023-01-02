@@ -112,7 +112,7 @@ namespace LuminaxLanguage.Processors
                 {
                     indexOfConstOrIndent = AnalysisInformation.Constants.Count + 1;
                     AnalysisInformation.Constants.Add(lexeme,
-                        new ValueContainer((int)indexOfConstOrIndent, token, lexeme));
+                        new ValueContainer((int)indexOfConstOrIndent, TypeConverter.ConvertType(token), lexeme));
                 }
 
                 _counter--;

@@ -7,5 +7,5 @@
         public Dictionary<string, ValueContainer> Constants = new();
     }
 
-    public record ValueContainer(int IdInTable, string? Type, object? Value);
+    public record ValueContainer(int IdInTable, Type? Type, object? Value);
 }

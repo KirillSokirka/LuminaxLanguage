@@ -1,4 +1,4 @@
-﻿using LuminaxLanguage.Constants;
+﻿using System.Globalization;
 using LuminaxLanguage.Dto;
 
 namespace LuminaxLanguage.Processors
@@ -20,55 +20,45 @@ namespace LuminaxLanguage.Processors
 
         public void InterpretCode(string filePath)
         {
-            if (TranslateCode(filePath))
-            {
-                try
-                {
-                    var result = Interpret();
+            TranslateCode(filePath);
 
-                    if (result)
-                    {
-                        Console.WriteLine("Interpreter: program has finished successfully");
-                    }
-                }
-                catch (InterpreterException e)
-                {
-                    Console.WriteLine(e.Message);
-                }
-            }
-        }
-
-        private bool TranslateCode(string filePath)
-        {
             try
             {
-                var currentState = 0;
+                Interpret();
 
-                foreach (var lineOfText in TextReader.GetLineOfText(filePath))
-                {
-                    _lexicalAnalyzer.Analyze(lineOfText, ref currentState);
-                }
-
-                Console.WriteLine("Lexer: Lexical analyzer was successfully completed");
-
-                _analysisInformation = _lexicalAnalyzer.AnalysisInformation;
-
-                _syntaxAnalyzer = new SyntaxAnalyzer(_analysisInformation, new BracketsProcessor());
-
-                _syntaxAnalyzer.ParseProgram();
-
-                Console.WriteLine("Parser: syntactic analyzer was successfully completed");
-                Console.WriteLine("RPN translation was successfully completed");
-
-                _postfixCode = _syntaxAnalyzer.PostfixCode;
+                Console.WriteLine("Interpreter: program has finished successfully");
+            }
+            catch (InterpreterException e)
+            {
+                Console.WriteLine(e.Message);
             }
             catch (Exception e)
             {
                 HandleErrors(e.Message);
-                return false;
+            }
+        }
+
+        private void TranslateCode(string filePath)
+        {
+            var currentState = 0;
+
+            foreach (var lineOfText in TextReader.GetLineOfText(filePath))
+            {
+                _lexicalAnalyzer.Analyze(lineOfText, ref currentState);
             }
 
-            return true;
+            Console.WriteLine("Lexer: Lexical analyzer was successfully completed");
+
+            _analysisInformation = _lexicalAnalyzer.AnalysisInformation;
+
+            _syntaxAnalyzer = new SyntaxAnalyzer(_analysisInformation, new BracketsProcessor());
+
+            _syntaxAnalyzer.ParseProgram();
+
+            _postfixCode = _syntaxAnalyzer.PostfixCode;
+
+            Console.WriteLine("Parser: syntactic analyzer was successfully completed");
+            Console.WriteLine("RPN translation was successfully completed");
         }
 
         private void HandleErrors(string errorMessage)
@@ -87,16 +77,15 @@ namespace LuminaxLanguage.Processors
             }
         }
 
-        private bool Interpret()
+        private void Interpret()
         {
-            var result = false;
             var postfixSize = _postfixCode.Count;
 
             while (_iterator < postfixSize)
             {
                 var tokenInfo = _postfixCode[_iterator];
 
-                result = tokenInfo switch
+                var result = tokenInfo switch
                 {
                     { Token: "boolval" or "int" or "float" or "exp" or "ident" } => InterpretIdentExpression(tokenInfo),
                     { Lexeme: "input" } => InterpretInputExpression(),
@@ -108,8 +97,6 @@ namespace LuminaxLanguage.Processors
 
                 _iterator++;
             }
-
-            return result;
         }
 
         private bool InterpretIdentExpression(TokenInformation tokenInfo)
@@ -177,8 +164,6 @@ namespace LuminaxLanguage.Processors
 
         private bool InterpretArithmOperations(TokenInformation left, TokenInformation operation, TokenInformation right)
         {
-            var result = false;
-
             var leftValue = GetTokenValue(left);
             var rightValue = GetTokenValue(right);
 
@@ -193,8 +178,8 @@ namespace LuminaxLanguage.Processors
         private ValueContainer GetTokenValue(TokenInformation left)
         {
             int idInTable;
-            object? value = null;
-            string? type = null;
+            object? value;
+            Type? type = null;
 
             if (left.Token is "ident")
             {
@@ -220,86 +205,71 @@ namespace LuminaxLanguage.Processors
         private bool CalculateArithmOperationValue(ValueContainer left, TokenInformation operation,
             ValueContainer right)
         {
-            var leftConvertedValue = ConvertToType(left);
-            var rightConvertedValue = ConvertToType(right);
-            dynamic value = null;
+            var leftConvertedValue = ConvertToType(left.Value!.ToString());
+            var rightConvertedValue = ConvertToType(right.Value!.ToString());
 
-            if (operation.Lexeme is "+")
+            float value = operation.Lexeme switch
             {
-                value = leftConvertedValue.Item1 + rightConvertedValue.Item1;
+                "+" => leftConvertedValue.Item1 + rightConvertedValue.Item1,
+                "-" => leftConvertedValue.Item1 - rightConvertedValue.Item2,
+                "*" => leftConvertedValue.Item1 * rightConvertedValue.Item2,
+                "/" => HandleDivisionByZero(rightConvertedValue, leftConvertedValue),
+                "^" => Math.Pow(leftConvertedValue.Item1, rightConvertedValue.Item1),
+                _ => throw new InterpreterException($"This kind of operation {operation.Lexeme} is not supported")
+            };
 
-                if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
-                {
-                    left = left with { Type = "float" };
-                }
-            }
-            else if (operation.Lexeme is "-")
-            {
-                value = leftConvertedValue.Item1 - rightConvertedValue.Item1;
+            left = HandleVariableType(left, leftConvertedValue, rightConvertedValue);
 
-                if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
-                {
-                    left = left with { Type = "float" };
-                }
-            }
-            else if (operation.Lexeme is "*")
-            {
-                value = leftConvertedValue.Item1 * rightConvertedValue.Item1;
-
-                if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
-                {
-                    left = left with { Type = "float" };
-                }
-            }
-            else if (operation.Lexeme is "/")
-            {
-                if (rightConvertedValue.Item1 == 0)
-                {
-                    throw new InterpreterException("Division by zero");
-                }
-
-                value = leftConvertedValue.Item1 / rightConvertedValue.Item1;
-
-                if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
-                {
-                    left = left with { Type = "float" };
-                }
-            }
-            else if (operation.Lexeme is "^")
-            {
-                value = leftConvertedValue.Item1 ^ rightConvertedValue.Item1;
-
-                if (leftConvertedValue.Item2 is not "int" && leftConvertedValue.Item2 == rightConvertedValue.Item2)
-                {
-                    left = left with { Type = "float" };
-                }
-            }
-
-            var newConstLexeme = value!.ToString();
+            var newConstLexeme = value.ToString(CultureInfo.CurrentCulture);
 
             if (!_analysisInformation!.Constants.ContainsKey(newConstLexeme))
             {
                 _analysisInformation!.Constants[newConstLexeme]
-                    = new ValueContainer((int)_analysisInformation!.Constants.Count + 1, left.Type, value);
+                    = new ValueContainer(_analysisInformation!.Constants.Count + 1, left.Type, value);
             }
 
-            _stack.Push(new TokenInformation(newConstLexeme, left.Type));
+            _stack.Push(new TokenInformation(newConstLexeme, TypeConverter. ConvertType(left.Type!)));
 
             return true;
         }
 
-        private (dynamic?, string) ConvertToType(object? value)
+        private static float HandleDivisionByZero((dynamic?, Type) rightConvertedValue, (dynamic?, Type) leftConvertedValue)
         {
-            dynamic? convertedValue = value as int?;
-            var type = string.Empty;
-
-            if (convertedValue is null)
+            if (rightConvertedValue.Item1 == 0)
             {
-                convertedValue = value as float?;
-                type = "float";
+                throw new InterpreterException("Division by zero");
             }
 
-            return (convertedValue, type);
+            float value = leftConvertedValue.Item1 / rightConvertedValue.Item1;
+
+            return value;
+        }
+
+        private static ValueContainer HandleVariableType(ValueContainer left, (object?, Type) leftConvertedValue,
+            (object?, Type) rightConvertedValue)
+        {
+            if (leftConvertedValue.Item2 != typeof(int) || rightConvertedValue.Item2 != typeof(int))
+            {
+                left = left with { Type = typeof(float) };
+            }
+
+            return left;
+        }
+
+        private (dynamic?, Type) ConvertToType(string? value)
+        {
+            if (int.TryParse(value, out var resultInt))
+            {
+                return (resultInt, typeof(int));
+            }
+            else if (float.TryParse(value, out var resultFloat))
+            {
+                return (resultFloat, typeof(float));
+            }
+            else
+            {
+                throw new Exception("Input string is not a valid int or float value");
+            }
         }
 
         private bool InterpretBooleanOperations(TokenInformation left, TokenInformation operation, TokenInformation right)
@@ -321,14 +291,15 @@ namespace LuminaxLanguage.Processors
 
         private bool ProcessBooleanExpression(ValueContainer leftValue, TokenInformation operation, ValueContainer rightValue)
         {
-            if (leftValue.Type is "boolval" && leftValue.Type == rightValue.Type)
+            if (leftValue.Type == typeof(bool) && leftValue.Type == rightValue.Type)
             {
-                leftValue = new ValueContainer(leftValue.IdInTable, "int", (int)leftValue.Value!);
-                rightValue = new ValueContainer(leftValue.IdInTable, "int", (int)rightValue.Value!);
+                leftValue = new ValueContainer(leftValue.IdInTable, typeof(int), (int)leftValue.Value!);
+                rightValue = new ValueContainer(leftValue.IdInTable, typeof(int), (int)rightValue.Value!);
                 CompareNumbers(leftValue, operation, rightValue);
                 return true;
             }
-            else if ((new[] { "int", "float", "exp" }).Contains(leftValue.Type) && leftValue.Type == rightValue.Type)
+
+            if (new[] { typeof(float), typeof(int) }.Contains(leftValue.Type) && leftValue.Type == rightValue.Type)
             {
                 CompareNumbers(leftValue, operation, rightValue);
                 return true;
@@ -358,7 +329,7 @@ namespace LuminaxLanguage.Processors
             if (!_analysisInformation!.Constants.ContainsKey(newConstLexeme))
             {
                 _analysisInformation!.Constants[newConstLexeme]
-                    = new ValueContainer((int)_analysisInformation!.Constants.Count + 1, "boolean", result);
+                    = new ValueContainer(_analysisInformation!.Constants.Count + 1, typeof(bool), result);
             }
 
             _stack.Push(new TokenInformation(newConstLexeme, "boolean"));
@@ -390,24 +361,24 @@ namespace LuminaxLanguage.Processors
 
         private ValueContainer? ParseConsoleInput(string? data, ValueContainer valueContainer)
         {
-            if (data is null or "")
+            if (string.IsNullOrEmpty(data))
             {
                 throw new InterpreterException("No data was provided for variable input");
             }
 
             var newValueContainer = valueContainer;
 
-            if (int.TryParse(data, out var value) && newValueContainer.Type is "int")
+            if (int.TryParse(data, out var value) && newValueContainer.Type == typeof(int))
             {
-                newValueContainer = newValueContainer with { Value = value, Type = "int" };
+                newValueContainer = newValueContainer with { Value = value, Type = typeof(int) };
             }
-            else if (float.TryParse(data, out var floatValue) && newValueContainer.Type is "float")
+            else if (float.TryParse(data, out var floatValue) && newValueContainer.Type == typeof(float))
             {
-                newValueContainer = newValueContainer with { Value = floatValue, Type = "float" };
+                newValueContainer = newValueContainer with { Value = floatValue, Type = typeof(float) };
             }
-            else if (bool.TryParse(data, out var boolValue) && newValueContainer.Type is "boolval")
+            else if (bool.TryParse(data, out var boolValue) && newValueContainer.Type == typeof(bool))
             {
-                newValueContainer = newValueContainer with { Value = boolValue, Type = "boolval" };
+                newValueContainer = newValueContainer with { Value = boolValue, Type = typeof(bool) };
             }
             else
             {
