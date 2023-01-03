@@ -340,15 +340,19 @@ namespace LuminaxLanguage.Processors
             if (ParseArithmeticExpression(symbol))
             {
                 symbol = SymbolsInformation[_iterator];
+                var flag = false;
 
-                if (ParseRelExpression(symbol))
+                while (ParseRelExpression(symbol) && ParseExpression())
                 {
-                    while (ParseRelExpression(symbol) && ParseExpression())
-                    {
-                        symbol = SymbolsInformation[Iterator];
-                        PostfixCode.Add(new TokenInformation(symbol.Lexeme, symbol.LexemeToken));
-                    }
+                    flag = true;
+                    
+                    PostfixCode.Add(new TokenInformation(symbol.Lexeme, symbol.LexemeToken));
 
+                    symbol = SymbolsInformation[_iterator];
+                }
+
+                if (flag)
+                {
                     return true;
                 }
 
@@ -360,7 +364,14 @@ namespace LuminaxLanguage.Processors
         }
 
         private bool ParseRelExpression(SymbolInformation symbolInformation)
-            => symbolInformation.LexemeToken is "rel_op" && ParseToken("rel_op", symbolInformation);
+        {
+            if (symbolInformation.LexemeToken is "rel_op" && ParseToken("rel_op", symbolInformation))
+            {
+                return true;
+            }
+
+            return false;
+        }
 
         private bool ParseArithmeticExpression(SymbolInformation symbolInformation)
         {
@@ -400,13 +411,21 @@ namespace LuminaxLanguage.Processors
             if (ParseChunk(symbolInformation))
             {
                 symbolInformation = SymbolsInformation![_iterator];
+                var count = 0;
 
                 while (symbolInformation.Lexeme is "*" or "/" && ParseToken("mult_op", symbolInformation))
                 {
+                    var multperator = symbolInformation.Lexeme;
+
                     symbolInformation = SymbolsInformation[Iterator];
 
                     if (!ParseChunk(symbolInformation))
                         return false;
+
+                    if (++count >= 1)
+                    {
+                        PostfixCode.Add(new TokenInformation(multperator, "mult_op"));
+                    }
 
                     symbolInformation = SymbolsInformation![_iterator];
                 }
@@ -422,6 +441,7 @@ namespace LuminaxLanguage.Processors
             if (ParseFactor(symbolInformation))
             {
                 var currentInformation = SymbolsInformation![_iterator];
+                var count = 0;
 
                 while (currentInformation.Lexeme == "^" && ParseToken(("^", "pow_op"), currentInformation))
                 {
@@ -431,6 +451,15 @@ namespace LuminaxLanguage.Processors
                         return false;
 
                     currentInformation = SymbolsInformation![_iterator];
+
+                    count++;
+                }
+
+                while (count + 1 != 1)
+                {
+                    PostfixCode.Add(new TokenInformation("^", "pow_op"));
+
+                    count--;
                 }
 
                 return true;

@@ -179,7 +179,7 @@ namespace LuminaxLanguage.Processors
         {
             int idInTable;
             object? value;
-            Type? type = null;
+            Type? type;
 
             if (left.Token is "ident")
             {
@@ -197,6 +197,7 @@ namespace LuminaxLanguage.Processors
 
                 idInTable = valueInformation.IdInTable;
                 value = valueInformation.Value;
+                type = typeof(float);
             }
 
             return new ValueContainer(idInTable, type, value);
@@ -208,13 +209,13 @@ namespace LuminaxLanguage.Processors
             var leftConvertedValue = ConvertToType(left.Value!.ToString());
             var rightConvertedValue = ConvertToType(right.Value!.ToString());
 
-            float value = operation.Lexeme switch
+            var value = operation.Lexeme switch
             {
                 "+" => leftConvertedValue.Item1 + rightConvertedValue.Item1,
-                "-" => leftConvertedValue.Item1 - rightConvertedValue.Item2,
-                "*" => leftConvertedValue.Item1 * rightConvertedValue.Item2,
+                "-" => leftConvertedValue.Item1 - rightConvertedValue.Item1,
+                "*" => leftConvertedValue.Item1 * rightConvertedValue.Item1,
                 "/" => HandleDivisionByZero(rightConvertedValue, leftConvertedValue),
-                "^" => Math.Pow(leftConvertedValue.Item1, rightConvertedValue.Item1),
+                "^" => (float)Math.Pow(leftConvertedValue.Item1, rightConvertedValue.Item1),
                 _ => throw new InterpreterException($"This kind of operation {operation.Lexeme} is not supported")
             };
 
@@ -228,7 +229,7 @@ namespace LuminaxLanguage.Processors
                     = new ValueContainer(_analysisInformation!.Constants.Count + 1, left.Type, value);
             }
 
-            _stack.Push(new TokenInformation(newConstLexeme, TypeConverter. ConvertType(left.Type!)));
+            _stack.Push(new TokenInformation(newConstLexeme, TypeConverter.ConvertType(left.Type!)));
 
             return true;
         }
@@ -256,20 +257,19 @@ namespace LuminaxLanguage.Processors
             return left;
         }
 
-        private (dynamic?, Type) ConvertToType(string? value)
+        private (float, Type) ConvertToType(string? value)
         {
             if (int.TryParse(value, out var resultInt))
             {
                 return (resultInt, typeof(int));
             }
-            else if (float.TryParse(value, out var resultFloat))
+
+            if (float.TryParse(value, out var resultFloat))
             {
                 return (resultFloat, typeof(float));
             }
-            else
-            {
-                throw new Exception("Input string is not a valid int or float value");
-            }
+
+            throw new Exception("Input string is not a valid int or float value");
         }
 
         private bool InterpretBooleanOperations(TokenInformation left, TokenInformation operation, TokenInformation right)
@@ -310,10 +310,10 @@ namespace LuminaxLanguage.Processors
 
         private void CompareNumbers(ValueContainer leftValue, TokenInformation operation, ValueContainer rightValue)
         {
-            var leftFloatValue = (float)leftValue.Value!;
-            var rightFloatValue = (float)rightValue.Value!;
+            var leftFloatValue = float.Parse(leftValue.Value!.ToString()!);
+            var rightFloatValue = float.Parse(rightValue.Value!.ToString()!);
 
-            var result = operation.Lexeme switch
+            var result = operation.Lexeme.Trim() switch
             {
                 ">=" => leftFloatValue >= rightFloatValue,
                 "<=" => leftFloatValue <= rightFloatValue,
@@ -332,7 +332,9 @@ namespace LuminaxLanguage.Processors
                     = new ValueContainer(_analysisInformation!.Constants.Count + 1, typeof(bool), result);
             }
 
+            var temp = _stack.Pop();
             _stack.Push(new TokenInformation(newConstLexeme, "boolean"));
+            _stack.Push(temp);
         }
 
         private bool InterpretInputExpression()
